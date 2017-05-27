@@ -1,0 +1,102 @@
+<?php
+  error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+  include($_SERVER['DOCUMENT_ROOT'] . '\\adtf\\config.php');
+
+  $data= json_decode($_POST["val"],TRUE);
+  echo $data;
+  exit;
+   $query = new SQL();
+   $ticket="";
+  // Params
+  for($i=0;$i<count($data);$i++) {
+    $Vendor = $data[$i]['a_Vendor'];
+  	$dt = $data[$i]['a_DateSubmitted'];
+  	//$dt=date('Y-m-d', strtotime($datesubmitted));
+  	$statementofwork = $data[$i]['a_StatementOfWork'];
+  	$workpallets = $data[$i]['a_NumberOfPallets'];
+  	$pickuplocation = $data[$i]['a_PickUpLocation'];
+  	$localRIMcontact = $data[$i]['a_LocalRIMContact'];
+  	$AssetType = $data[$i]['Asset Type'];
+  	$WO = $data[$i]['a_WO'];
+
+    if($data[$i]['Asset ID']=="")	{
+  		$AssetID = "N/A";
+  	}	else {
+  		$AssetID = $data[$i]['Asset ID'];
+  	}
+
+    if($data[$i]['a_Manufacturer']=="")	{
+  		$Manufacturer = "N/A";
+  	}	else {
+  		$Manufacturer = $data[$i]['a_Manufacturer'];
+  	}
+
+  	if($data[$i]['a_Model']=="")	{
+  		$Model = "N/A";
+  	}	else {
+  		$Model = $data[$i]['a_Model'];
+  	}
+
+  	if($data[$i]['a_SerialNo']=="")	{
+  		$SerialNo = "N/A";
+  	}	else {
+  		$SerialNo = $data[$i]['a_SerialNo'];
+  	}
+
+  	if($data[$i]['a_Description']=="")	{
+  		$Description = "N/A";
+  	}	else {
+  		$Description=$data[$i]['a_Description'];
+  	}
+
+  	if($data[$i]['a_Weight']=="")	{
+  		$Weight = "N/A";
+  	}	else {
+  		$Weight=$data[$i]['a_Weight'];
+  	}
+
+    $jira = new JIRA();
+    $date = date("Y-m-d");
+    $sum = "ADTF >> " . $pickuplocation . " >> "  . $date;
+    $desc = "Vendor: $Vendor \n\n SOW: $statementofwork\n\n Pallets: $workpallets \n\n Pickup Location: $pickuplocation\n\n Contact: $localRIMcontact \n\n ";
+
+    if($i==0)  {
+    // If Ticket Provided...
+      if(!$WO) {
+        $ticket = $jira->createTicket($sum, $desc, "End User Services", "HW Asset Management");
+        $ticket = json_decode($ticket, true);
+        $ticket = $ticket["key"];
+        $jira->setKey($ticket);
+        // Add Direct ADTF Link
+        $url = "http://tlws003ykf/adtf/Search.php?s_Vendor=&s_AssetType=&s_Manufacturer=&s_Model=&s_AssetID=&s_SerialNo=&s_WO=". $ticket . "&var=Array&selection=WO#";
+        $link = "Direct ADTF Link \n\n " . $url;
+        $jira->addComment($link);
+      } else { // Otherwise Create New
+        $jira->setKey($WO);
+        $ticket = $WO;
+        $jira->addComment($desc);
+        $url = "http://tlws003ykf/adtf/Search.php?s_Vendor=&s_AssetType=&s_Manufacturer=&s_Model=&s_AssetID=&s_SerialNo=&s_WO=". $ticket . "&var=Array&selection=WO#";
+        $link = "Direct ADTF Link \n\n " . $url;
+        $jira->addComment($link);
+      }
+    }
+
+    // Insert Statement (ewasteDB)
+    $sql = "INSERT INTO ".$env->ewasteDB.".[dbo].[tbl_asset_tracking](Vendor,Date_Submitted,StatementOfWork,NumberOfPallets,PickUpLocation,LocalRIMContact,Asset_Type,Asset_ID,Manufacturer,Model,Serial_No,Description,Weight,LoadID) VALUES('$Vendor','$dt','$statementofwork','$workpallets','$pickuplocation','$localRIMcontact','$AssetType','$AssetID','$Manufacturer','$Model','$SerialNo','$Description','$Weight','$ticket')";
+    $result= $query->query($sql);
+  }
+  // // Email
+  // $email = new Email();
+  // $email->setParams(array(
+  //   "recipient"=>"legalhold@blackberry.com",
+  //   "templateID"=>"666644980",
+  //   "json_data"=>array(
+  //     "oldUser"=>$pUser,
+  //     "newUser"=>$temp['contact_id_friendlyname']
+  //   )
+  // ));
+  // $email->send();
+  // Result
+  $final = array($ticket,$url);
+  echo json_encode($final);
+?>
